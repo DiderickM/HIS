@@ -144,6 +144,8 @@ void loop(){
   //print results
   Serial.print(frequency);
   Serial.println(" hz");
+
+  Serial.println("\t OK");
   
   delay(100);//feel free to remove this if you want
   
