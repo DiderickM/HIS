@@ -1,4 +1,17 @@
-/clipping indicator variables
+//generalized wave freq detection with 38.5kHz sampling rate and interrupts
+//by Amanda Ghassaei
+//https://www.instructables.com/id/Arduino-Frequency-Detection/
+//Sept 2012
+
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+*/
+
+//clipping indicator variables
 boolean clipping = 0;
 
 //data storage variables
@@ -6,7 +19,7 @@ byte newData = 0;
 byte prevData = 0;
 unsigned int time = 0;//keeps time and sends vales to store in timer[] occasionally
 int timer[10];//sstorage for timing of events
-int slope[10];//storage for slope of events
+int slope[10];//storage fro slope of events
 unsigned int totalTimer;//used to calculate period
 unsigned int period;//storage for period of wave
 byte index = 0;//current storage index
@@ -19,11 +32,6 @@ byte noMatch = 0;//counts how many non-matches you've received to reset variable
 byte slopeTol = 3;//slope tolerance- adjust this if you need
 int timerTol = 10;//timer tolerance- adjust this if you need
 
-//variables for amp detection
-unsigned int ampTimer = 0;
-byte maxAmp = 0;
-byte checkMaxAmp;
-byte ampThreshold = 30;//raise if you have a very noisy signal
 
 void setup(){
   
@@ -110,17 +118,6 @@ ISR(ADC_vect) {//when new ADC value ready
   }
   
   time++;//increment timer at rate of 38.5kHz
-  
-  ampTimer++;//increment amplitude timer
-  if (abs(127-ADCH)>maxAmp){
-    maxAmp = abs(127-ADCH);
-  }
-  if (ampTimer==1000){
-    ampTimer = 0;
-    checkMaxAmp = maxAmp;
-    maxAmp = 0;
-  }
-  
 }
 
 void reset(){//clea out some variables
@@ -142,18 +139,14 @@ void loop(){
   
   checkClipping();
   
-  if (checkMaxAmp>ampThreshold){
-    frequency = 38462/float(period);//calculate frequency timer rate/period
+  frequency = 38462/float(period);//calculate frequency timer rate/period
   
-    //print results
-    Serial.print(frequency);
-    Serial.println(" hz");
-  }
+  //print results
+  Serial.print(frequency);
+  Serial.println(" hz");
   
-  delay(100);//delete this if you want
+  delay(100);//feel free to remove this if you want
   
   //do other stuff here
 }
-
-
 
