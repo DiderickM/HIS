@@ -1,0 +1,79 @@
+#include <Wire.h>
+#define ADXL345_POWER_CTL 45
+
+#define interuptPin 2
+
+#define ledPin 4
+
+byte values[6];
+char output[512];
+void setup() {
+  Wire.begin();        // join i2c bus (address optional for master)
+  Serial.begin(9600);  // start serial for output
+  Wire.beginTransmission(0x53);
+  Wire.write(0x2D);
+  Wire.write(0);
+  Wire.endTransmission();
+  Wire.beginTransmission(0x53);
+  Wire.write(0x2D);
+  Wire.write(16);
+  Wire.endTransmission();
+  Wire.beginTransmission(0x53);
+  Wire.write(0x2D);
+  Wire.write(8);
+  Wire.endTransmission();
+
+  pinMode(ledPin, OUTPUT); 
+  
+  attachInterrupt(digitalPinToInterrupt(interuptPin), ISR_fuction, FALLING);
+}
+
+bool buttonPressed = false;
+
+void ISR_fuction() {
+  if(buttonPressed) {
+    buttonPressed = false;
+  } else {
+    buttonPressed = true;
+  }
+}
+
+
+
+void loop() {
+  digitalWrite(ledPin, buttonPressed);
+  if(!buttonPressed) {
+    int x, y, z;
+    int xyzregister = 0x32;
+    Wire.beginTransmission(0x53);
+    Wire.write(xyzregister);
+    Wire.endTransmission();
+  
+    Wire.beginTransmission(0x53);
+    Wire.requestFrom(0x53, 6);    // request 6 bytes from slave device #8
+    int i = 0;
+    while (Wire.available()) { // slave may send less than requested
+      values[i] = Wire.read(); // receive a byte as character
+      i++;
+    }
+    Wire.endTransmission();
+  
+    x =(((int)values[1]) << 8) | values[0];
+    y =(((int)values[3]) << 8) | values[2];
+    z =(((int)values[5]) << 8) | values[4];
+  
+    sprintf(output, "%d %d %d", x,y,z);
+  
+    Serial.print(output);
+    Serial.write(10);
+  } else {
+    Wire.requestFrom(0x4A, 1);
+    int temp = 0;
+    while(Wire.available()) {
+      temp = Wire.read();
+    }
+    Serial.print("teprature is: ");
+    Serial.println(temp);
+  }  
+  delay(500);
+}

@@ -9,6 +9,7 @@
 #define LED_PIN 2
 #define NUM_LEDS 60
 
+//predifine the sensor values
 #define MIC_LOW 530
 #define MIC_HIGH 600
 
@@ -17,7 +18,7 @@
 #define BUFFER_DEVIATION 400
 #define BUFFER_SIZE 3
 
-#define LAMP_ID 1
+#define LAMP_ID 3
 WiFiUDP UDP;
 
 const char *ssid = "sound_reactive"; // The SSID (name) of the Wi-Fi network you want to connect to
@@ -55,8 +56,8 @@ void setup()
   longTermSamples = new averageCounter(LONG_TERM_SAMPLES);
   sanityBuffer    = new averageCounter(BUFFER_SIZE);
   
-  while(sanityBuffer->setSample(250) == true) {}
-  while (longTermSamples->setSample(200) == true) {}
+  while(sanityBuffer->setSample(250) == true) {} //set sanityBuffer
+  while (longTermSamples->setSample(200) == true) {} //set logTerSamples
 
   FastLED.addLeds<WS2812B, LED_PIN, RGB>(leds, NUM_LEDS);
 
@@ -71,25 +72,25 @@ void setup()
 
   connectToWifi();
   sendHeartBeat();
-  UDP.begin(7001);
+  UDP.begin(7001); //Initializes the ethernet UDP library and network settings.
 }
 
-void sendHeartBeat() {
+void sendHeartBeat() { //send info to master that it has been connected
     struct heartbeat_message hbm;
     hbm.client_id = LAMP_ID;
-    hbm.chk = 77777;
+    hbm.chk = 77777; //make shure to send some info
     Serial.println("Sending heartbeat");
     IPAddress ip(192,168,4,1);
     UDP.beginPacket(ip, 7171); 
     int ret = UDP.write((char*)&hbm,sizeof(hbm));
     printf("Returned: %d, also sizeof hbm: %d \n", ret, sizeof(hbm));
     UDP.endPacket();
-    lastHeartBeatSent = millis();
+    lastHeartBeatSent = millis(); //reset timer
 }
 
 void loop()
 {
-  if (millis() - lastHeartBeatSent > heartBeatInterval) {
+  if (millis() - lastHeartBeatSent > heartBeatInterval) { //make shure the master knows the ESP is connected
     sendHeartBeat();
   }
 
@@ -99,15 +100,15 @@ void loop()
   if (packetSize)
   {
     UDP.read((char *)&cmd, sizeof(struct led_command));
-    lastReceived = millis();
+    lastReceived = millis(); //reset timer, Lastrecived keeps track on the time it takes to get a value
   }
 
-  if(millis() - lastReceived >= 5000)
+  if(millis() - lastReceived >= 5000) //if it takes longer than 5000 ms to get data, it means it is probably not connected. So go try reconnect
   {
     connectToWifi();
   }
     
-  int opMode = cmd.opmode;
+  int opMode = cmd.opmode; //this os for the mode the led pillar should display.
   int analogRaw = cmd.data;
 
   switch (opMode) {
@@ -118,11 +119,11 @@ void loop()
 
     case 2:
       fade = false;
-      allWhite();
+      allWhite(); //make all led white
       break;
 
     case 3:
-      chillFade();
+      chillFade(); //make the leds do a chill fade effect
       break;
   }
   
@@ -132,7 +133,7 @@ void allWhite() {
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CRGB(255, 255, 235);
   }
-  delay(5);
+  delay(5); //Fast led sometimes needs some time to load
   FastLED.show();
 }
 
@@ -184,21 +185,21 @@ void chillFade() {
 
 void soundReactive(int analogRaw) {
 
- int sanityValue = sanityBuffer->computeAverage();
- if (!(abs(analogRaw - sanityValue) > BUFFER_DEVIATION)) {
+ int sanityValue = sanityBuffer->computeAverage(); //calculate the sanityValue it is the average of how far the value array is filled
+ if (!(abs(analogRaw - sanityValue) > BUFFER_DEVIATION)) { //(abs == Calculates the absolute value of a number.) The analogRaw - sanityValue should be lower than de BUFFER_DEVIATION to make shure that the sanity buffer is right.
     sanityBuffer->setSample(analogRaw);
  }
-  analogRaw = fscale(MIC_LOW, MIC_HIGH, MIC_LOW, MIC_HIGH, analogRaw, 0.6);
+  analogRaw = fscale(MIC_LOW, MIC_HIGH, MIC_LOW, MIC_HIGH, analogRaw, 0.6); //make shure the analogRaw value is between the defined sensor values.
 
-  if (samples->setSample(analogRaw))
+  if(samples->setSample(analogRaw))
     return;
     
-  uint16_t longTermAverage = longTermSamples->computeAverage();
-  uint16_t useVal = samples->computeAverage();
-  longTermSamples->setSample(useVal);
+  uint16_t longTermAverage = longTermSamples->computeAverage(); //compute the average of the long term saples, this changes the 'hue' of the rainbow
+  uint16_t useVal = samples->computeAverage(); //get the average of the sample values. This also changes the 'hue', also this value is loaded in the longTermSamples
+  longTermSamples->setSample(useVal); 
 
   int diff = (useVal - longTermAverage);
-  if (diff > 5)
+  if (diff > 5) //if the differance is bigger than 5 change the 'hue'
   {
     if (globalHue < 235)
     {
@@ -214,18 +215,18 @@ void soundReactive(int analogRaw) {
   }
 
 
-  int curshow = fscale(MIC_LOW, MIC_HIGH, 0.0, (float)NUM_LEDS, (float)useVal, 1.2);
-  //int curshow = map(useVal, MIC_LOW, MIC_HIGH, 0, NUM_LEDS)
+  int curshow = fscale(MIC_LOW, MIC_HIGH, 0.0, (float)NUM_LEDS, (float)useVal, 1.2); //this is how many leds are actually lit. Scale the sensor value to the amout of led that need to be lit. The 1.2 is for the curve
+  //int curshow = map(useVal, MIC_LOW, MIC_HIGH, 0, NUM_LEDS) //same as above but this is linear
 
   for (int i = 0; i < NUM_LEDS; i++)
   {
     if (i < curshow)
     {
-      leds[i] = CHSV(globalHue + hueOffset + (i * 2), 255, 255);
+      leds[i] = CHSV(globalHue + hueOffset + (i * 2), 255, 255); //calculate the color
     }
     else
     {
-      leds[i] = CRGB(leds[i].r / fadeScale, leds[i].g / fadeScale, leds[i].b / fadeScale);
+      leds[i] = CRGB(leds[i].r / fadeScale, leds[i].g / fadeScale, leds[i].b / fadeScale); //make the leds fade to off
     }
     
   }
@@ -234,12 +235,12 @@ void soundReactive(int analogRaw) {
 }
 
 void connectToWifi() {
-   WiFi.mode(WIFI_STA);
-  for (int i = 0; i < NUM_LEDS; i++)
+  WiFi.mode(WIFI_STA);
+  for (int i = 0; i < NUM_LEDS; i++) //clear led
   {
     leds[i] = CHSV(0, 0, 0);
   }
-  leds[0] = CRGB(0, 255, 0);
+  leds[0] = CRGB(0, 255, 0); //make first led red
   FastLED.show();
   
   int i = 0;
@@ -253,11 +254,13 @@ void connectToWifi() {
   Serial.println("Connection established!");
   Serial.print("IP address:\t");
   Serial.println(WiFi.localIP()); // Send the IP address of the ESP8266 to the computer
-  leds[0] = CRGB(0, 0, 255);
+  leds[0] = CRGB(0, 0, 255); //make first led blue
   FastLED.show();
-  lastReceived = millis();
+  lastReceived = millis(); //reset lastrecieved, so make shure it stays connected
 }
-float fscale(float originalMin, float originalMax, float newBegin, float newEnd, float inputValue, float curve)
+
+float fscale(float originalMin, float originalMax, float newBegin, float newEnd, float inputValue, float curve) //the standard fscale function stolen from internet. 
+//documentation: http://playground.arduino.cc/main/fscale
 {
 
   float OriginalRange = 0;
